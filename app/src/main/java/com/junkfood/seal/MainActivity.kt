@@ -1,13 +1,17 @@
 package com.junkfood.seal
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.lifecycle.lifecycleScope
 import com.junkfood.seal.App.Companion.context
 import com.junkfood.seal.ui.common.LocalDarkTheme
 import com.junkfood.seal.ui.common.SettingsProvider
@@ -17,6 +21,8 @@ import com.junkfood.seal.ui.theme.SealTheme
 import com.junkfood.seal.util.PreferenceUtil
 import com.junkfood.seal.util.matchUrlFromSharedText
 import com.junkfood.seal.util.setLanguage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.compose.KoinContext
@@ -32,6 +38,28 @@ class MainActivity : AppCompatActivity() {
             runBlocking { setLanguage(PreferenceUtil.getLocaleFromPreference()) }
         }
         enableEdgeToEdge()
+
+        // Lógica "Estilo Snaptube": Detección de portapapeles
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        lifecycleScope.launch {
+            delay(2000) // Espera a que la app cargue para no interrumpir el inicio
+            if (clipboard.hasPrimaryClip()) {
+                val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                
+                // Si el texto empieza con http, simulamos una acción de "Compartir"
+                if (text.contains("http")) {
+                    val intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    val url = intent.getSharedURL()
+                    if (url != null) {
+                        Toast.makeText(this@MainActivity, "Enlace detectado: $url", Toast.LENGTH_SHORT).show()
+                        dialogViewModel.postAction(DownloadDialogViewModel.Action.ShowSheet(listOf(url)))
+                    }
+                }
+            }
+        }
 
         context = this.baseContext
         setContent {
